@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus { CREATED AWAITING_PAYMENT PAID PROCESSING FULFILLED CANCELLED }
+enum ProductType { MAGNET BADGE }
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  phone     String?
+  role      String   @default("user") // user | admin
+  password  String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+  status        OrderStatus @default(CREATED)
+  subtotalCents Int
+  shippingCents Int
+  totalCents    Int
+  currency      String @default("PHP")
+  email         String
+  phone         String
+  shipTo        Json
+  items         OrderItem[]
+  payments      Payment[]
+  proofs        PaymentProof[]
+  events        OrderEvent[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model OrderItem {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id])
+  productType    ProductType
+  quantity       Int
+  unitPriceCents Int
+  originalKey    String
+  cropData       Json
+  processedKey   String?
+  size           String
+  options        Json
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id])
+  connectorId   String?
+  provider      String
+  method        String
+  reference     String   @unique
+  amountCents   Int
+  status        String
+  raw           Json
+  createdAt     DateTime @default(now())
+}
+
+model PaymentProof {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  s3key     String
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id])
+  type      String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+model PaymentConnector {
+  id           String   @id @default(cuid())
+  provider     String
+  label        String
+  mode         String
+  enabled      Boolean  @default(true)
+  configEnc    Bytes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model WebhookLog {
+  id           String   @id @default(cuid())
+  provider     String
+  eventType    String
+  statusCode   Int
+  signatureOk  Boolean
+  payload      Json
+  createdAt    DateTime @default(now())
+}
